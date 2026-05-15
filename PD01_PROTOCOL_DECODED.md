@@ -13,11 +13,11 @@
 [0x51][0x78][CMD][0x00][LEN_LO][LEN_HI][DATA...][CRC8][0xFF]
 ```
 
-### Key Differences from Our Implementation:
-1. ✅ Magic Header: `0x51 0x78` (we got this right)
-2. ❌ **Separator**: `0x00` after CMD (we had this)
-3. ❌ **Bit Ordering**: Uses MSB-first for bitmap packing (we changed to LSB - WRONG!)
-4. ❌ **Command Codes**: Different codes than we used
+### Key Differences from Our Original Implementation:
+1. ✅ Magic Header: `0x51 0x78` (correct)
+2. ✅ **Separator**: `0x00` after CMD (correct)
+3. ✅ **Bit Ordering**: LSB-first for bitmap packing (correct - see explanation below)
+4. ❌ **Command Codes**: Were using wrong codes (now fixed)
 
 ## Command Codes (Java signed bytes → hex)
 
@@ -74,9 +74,25 @@ byte b4 = (byte) (
 );
 ```
 
-**This packs bits MSB-FIRST!** Not LSB-first.
-- Pixel 0 → bit 0 (LSB)
-- Pixel 7 → bit 7 (MSB)
+**IMPORTANT: This is LSB-first packing!**
+- **src[i6]** (first array element / pixel 0) → **bit 0 (LSB)**
+- **src[i6+7]** (8th array element / pixel 7) → **bit 7 (MSB)**
+
+**For Flutter/Mobile implementation:**
+```dart
+// Pack 8 pixels into 1 byte (LSB-first)
+int packByte(List<int> pixels, int startIndex) {
+  int byte = 0;
+  for (int i = 0; i < 8; i++) {
+    if (pixels[startIndex + i] > 0) {  // if black pixel
+      byte |= (1 << i);  // set bit i (LSB-first)
+    }
+  }
+  return byte;
+}
+```
+
+In Python we use: `np.packbits(row, bitorder='little')` which does exactly this.
 
 ## CRC8 Calculation
 
@@ -142,16 +158,16 @@ LEN_HI = 0x00  # (48 >> 8) & 0xFF
 51 78 A1 00 02 00 30 00 F9 FF
 ```
 
-## Key Errors in Our Implementation:
+## What We Fixed (Reference for Flutter Implementation):
 
-1. ❌ **CMD 0x10**: Should be 0xA2 for quality/bitmap  
-2. ❌ **CMD 0xA8**: Doesn't exist in protocol
-3. ❌ **CMD 0xA3**: Correct, but used wrong context
-4. ❌ **CMD 0x00**: Should be 0xA2 for bitmap rows
-5. ❌ **CMD 0xB1**: Should be 0xA1 for paper feed
-6. ✅ **CRC8 algorithm**: Correct
-7. ❌ **Bit packing**: Changed to LSB-first but should stay MSB-first!
-8. ✅ **Packet structure**: Correct
+1. ✅ **CMD 0xA2**: For quality AND bitmap rows (was using 0x10, 0x00)
+2. ✅ **CMD 0xA1**: For paper feed (was using 0xB1)
+3. ✅ **CMD 0xA6**: For print lattice init/finish (was using 0xA8, 0xA3)
+4. ✅ **CMD 0xA3**: For get device state (correct usage)
+5. ✅ **CRC8 algorithm**: Polynomial 0x07, correct from the start
+6. ✅ **Bit packing**: LSB-first (pixel 0 → bit 0)
+7. ✅ **Packet structure**: [0x51][0x78][CMD][0x00][LEN_LO][LEN_HI][DATA][CRC8][0xFF]
+8. ✅ **Print sequence**: Quality → Lattice Init → Bitmap Rows → Feed → Lattice Finish → Get State
 
 ## Notifications Explained
 
@@ -165,3 +181,68 @@ From `ytbBleFastV3Module.java`:
 ```
 
 The printer uses CMD 0xAE for flow control notifications.
+
+---
+
+## Flutter Implementation Guide
+
+### BLE Service & Characteristics
+```dart
+final serviceUuid = "0000ae30-0000-1000-8000-00805f9b34fb";
+final writeCharUuid = "0000ae01-0000-1000-8000-00805f9b34fb";  // Write without response
+final notifyCharUuid = "0000ae02-0000-1000-8000-00805f9b34fb"; // Optional notifications
+```
+
+### Print Receipt Workflow
+```dart
+// 1. Connect to PD01 printer via BLE
+// 2. Resize receipt image to 384px width
+// 3. Convert to grayscale
+// 4. Apply dithering (Floyd-Steinberg recommended)
+// 5. Convert to 1-bit bitmap (48 bytes per row)
+// 6. Pack bits LSB-first
+// 7. Send print sequence:
+
+List<List<int>> buildPrintJob(List<int> imageData, int quality) {
+  List<List<int>> packets = [];
+  
+  // 1. Quality command
+  packets.add([0x51, 0x78, 0xA2, 0x00, 0x01, 0x00, 0x30 + quality, crc, 0xFF]);
+  
+  // 2. Lattice init
+  packets.add([0x51, 0x78, 0xA6, 0x00, 0x0B, 0x00, 
+               0xAA, 0x55, 0x17, 0x38, 0x44, 0x5F, 0x5F, 0x5F, 0x44, 0x38, 0x2C, crc, 0xFF]);
+  
+  // 3. Bitmap rows (48 bytes each)
+  for (int i = 0; i < imageData.length; i += 48) {
+    List<int> row = imageData.sublist(i, i + 48);
+    packets.add([0x51, 0x78, 0xA2, 0x00, 0x30, 0x00, ...row, crc, 0xFF]);
+  }
+  
+  // 4. Feed paper
+  packets.add([0x51, 0x78, 0xA1, 0x00, 0x02, 0x00, 0x30, 0x00, crc, 0xFF]);
+  
+  // 5. Lattice finish  
+  packets.add([0x51, 0x78, 0xA6, 0x00, 0x0B, 0x00,
+               0xAA, 0x55, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x17, crc, 0xFF]);
+  
+  // 6. Get state
+  packets.add([0x51, 0x78, 0xA3, 0x00, 0x01, 0x00, 0x00, crc, 0xFF]);
+  
+  return packets;
+}
+```
+
+### Flutter Packages Needed
+```yaml
+dependencies:
+  flutter_blue_plus: ^1.14.0  # For BLE communication
+  image: ^4.0.0                # For image processing
+```
+
+### Key Implementation Notes
+1. **Write without response**: Use `writeWithoutResponse` for better performance
+2. **MTU**: Negotiate MTU to 248 bytes for faster transmission
+3. **Delay**: Add 10ms delay between packets
+4. **Image width**: Always resize to exactly 384 pixels
+5. **Quality**: 1-5 (1=lightest, 5=darkest), use 2-3 for receipts
