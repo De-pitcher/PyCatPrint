@@ -1,0 +1,16 @@
+# Core BLE Communication
+bleak>=0.21.0
+
+# Image Processing
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# PDF Handling
+pdf2image>=1.16.0
+pypdf>=3.0.0
+
+# CLI Framework
+click>=8.1.0
+
+# Utilities
+colorama>=0.4.6
