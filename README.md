@@ -40,32 +40,51 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
+# Scan for nearby cat printers
+pycatprint scan
+
+# Test connection to a printer
+pycatprint test
+pycatprint test --device "GT01"
+
 # Print an image
-python pycatprint.py --input photo.jpg
+pycatprint print-file --input photo.jpg
 
 # Print a PDF
-python pycatprint.py --input document.pdf
+pycatprint print-file --input document.pdf
 
 # Customize print settings
-python pycatprint.py --input image.png --darkness 80 --speed 2 --dither floyd-steinberg
+pycatprint print-file --input image.png --darkness 80 --speed 2 --dither floyd-steinberg
 
 # Preview before printing
-python pycatprint.py --input image.png --preview
+pycatprint print-file --input image.png --preview
 
 # Specify device
-python pycatprint.py --input image.png --device "GT01"
+pycatprint print-file --input image.png --device "GT01"
+
+# Enable verbose logging
+pycatprint print-file --input image.png --verbose
 ```
 
-## CLI Arguments
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `scan` | Scan for nearby cat printer devices |
+| `test` | Test connection to a cat printer |
+| `print-file` | Print an image or PDF file |
+
+## CLI Arguments (print-file)
 
 | Argument | Type | Description |
 |----------|------|-------------|
-| `--input` | str | Path to image (PNG/JPG) or PDF file |
-| `--device` | str | BLE device name or MAC address (optional, auto-scans by default) |
-| `--darkness` | int/str | Thermal energy level: 0-100 or Light/Medium/Dark |
-| `--speed` | int | Print speed: 1 (slow), 2 (medium), 3 (fast) |
-| `--dither` | str | Dithering algorithm: floyd-steinberg, atkinson, halftone |
+| `-i, --input` | str | Path to image (PNG/JPG) or PDF file (required) |
+| `-d, --device` | str | BLE device name or MAC address (optional, auto-scans by default) |
+| `--darkness` | int | Thermal energy level: 0-100 (default: 50) |
+| `--speed` | int | Print speed: 1 (slow), 2 (medium), 3 (fast) (default: 2) |
+| `--dither` | str | Dithering algorithm: floyd-steinberg, atkinson, halftone (default: floyd-steinberg) |
 | `--preview` | flag | Show 1-bit bitmap preview before printing |
+| `-v, --verbose` | flag | Enable verbose logging |
 
 ## Technical Details
 
