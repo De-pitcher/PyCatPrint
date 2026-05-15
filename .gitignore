@@ -48,6 +48,25 @@ htmlcov/
 .dmypy.json
 dmypy.json
 
+# Temporary test files
+test_*.py
+test_*.png
+quick_test_*.py
+create_*_test.py
+check_*.py
+discover_*.py
+
+# APK decompilation (large files)
+fun_print/
+apk_extracted/
+jadx/
+jadx-gui/
+*.apk
+
+# OS
+.DS_Store
+Thumbs.db
+
 # OS
 .DS_Store
 Thumbs.db

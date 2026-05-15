@@ -187,24 +187,33 @@ class CatPrinter:
         if not self.client:
             raise ConnectionError("Not connected to device")
         
-        # Try to find the write characteristic by UUID
         services = self.client.services
         
+        # First, try to find the standard cat printer write characteristic
+        for service in services:
+            for char in service.characteristics:
+                if char.uuid == self.WRITE_CHARACTERISTIC_UUID:
+                    self.write_characteristic = char.uuid
+                    logger.info(f"Found standard write characteristic: {char.uuid}")
+                    return
+        
+        # Fallback: Look for any characteristic with write-without-response
         for service in services:
             for char in service.characteristics:
                 logger.debug(f"Characteristic: {char.uuid} - {char.properties}")
                 
-                # Look for write characteristic
+                if "write-without-response" in char.properties:
+                    self.write_characteristic = char.uuid
+                    logger.info(f"Found write-without-response characteristic: {char.uuid}")
+                    return
+        
+        # Last resort: Look for any writable characteristic
+        for service in services:
+            for char in service.characteristics:
                 if "write" in char.properties:
                     self.write_characteristic = char.uuid
                     logger.info(f"Found write characteristic: {char.uuid}")
                     return
-        
-        # If specific UUID is available
-        if self.WRITE_CHARACTERISTIC_UUID in [c.uuid for s in services for c in s.characteristics]:
-            self.write_characteristic = self.WRITE_CHARACTERISTIC_UUID
-            logger.info(f"Using standard write characteristic: {self.WRITE_CHARACTERISTIC_UUID}")
-            return
         
         raise ConnectionError("Write characteristic not found")
     
@@ -267,6 +276,70 @@ class CatPrinter:
                 raise ConnectionError(f"Failed to send data: {e}")
         
         logger.info("Data transmission complete")
+        return True
+    
+    async def send_packet(self, packet: bytes, delay_ms: int = 10) -> bool:
+        """
+        Send a complete protocol packet without chunking.
+        
+        For PD01 printers, each packet must be sent as a complete unit
+        to preserve the protocol structure: [0x51 0x78][CMD][0x00][LEN][DATA][CRC8][0xFF]
+        
+        Args:
+            packet: Complete protocol packet bytes
+            delay_ms: Delay in milliseconds after sending (default: 10ms)
+            
+        Returns:
+            True if successful
+            
+        Raises:
+            ConnectionError: If not connected or write fails
+        """
+        if not self._connected or not self.client:
+            raise ConnectionError("Not connected to device")
+        
+        if not self.write_characteristic:
+            raise ConnectionError("Write characteristic not available")
+        
+        try:
+            # Send complete packet as a single BLE write
+            await self.client.write_gatt_char(
+                self.write_characteristic,
+                packet,
+                response=False  # Write without response (as per PD01 protocol)
+            )
+            logger.debug(f"Sent packet: {len(packet)} bytes")
+            
+            # Delay to prevent buffer overflow on printer
+            await asyncio.sleep(delay_ms / 1000.0)
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to send packet: {e}")
+            raise ConnectionError(f"Failed to send packet: {e}")
+    
+    async def send_packets(self, packets: List[bytes], delay_ms: int = 10) -> bool:
+        """
+        Send multiple complete protocol packets.
+        
+        Args:
+            packets: List of complete protocol packet bytes
+            delay_ms: Delay in milliseconds between packets (default: 10ms)
+            
+        Returns:
+            True if all packets sent successfully
+            
+        Raises:
+            ConnectionError: If any packet fails to send
+        """
+        logger.info(f"Sending {len(packets)} packets to printer...")
+        
+        for i, packet in enumerate(packets, 1):
+            await self.send_packet(packet, delay_ms)
+            logger.debug(f"Sent packet {i}/{len(packets)}")
+        
+        logger.info("All packets transmitted successfully")
         return True
     
     def _create_packet(self, payload: bytes) -> bytes:

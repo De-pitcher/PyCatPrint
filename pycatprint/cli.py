@@ -7,6 +7,8 @@ import logging
 import click
 from pathlib import Path
 from pycatprint.ble import CatPrinter, DeviceNotFoundError, ConnectionError
+from pycatprint.image_processor import ImageProcessor
+from pycatprint.printer_commands import PrinterCommands
 from pycatprint.utils import validate_input_file, print_success, print_error, print_info
 
 
@@ -15,6 +17,7 @@ logging.basicConfig(
     level=logging.WARNING,
     format='%(levelname)s: %(message)s'
 )
+logger = logging.getLogger(__name__)
 
 
 @click.group()
@@ -133,19 +136,48 @@ def print_file(input, device, darkness, speed, dither, preview, verbose):
         printer = CatPrinter(device_name=device)
         
         try:
+            # Show preview if requested
+            if preview:
+                print_info("Generating preview...")
+                processor = ImageProcessor(dither_method=dither)
+                ascii_preview = processor.get_preview_ascii(input, max_width=60)
+                click.echo("\nPreview:")
+                click.echo("=" * 60)
+                click.echo(ascii_preview)
+                click.echo("=" * 60)
+                
+                if not click.confirm("\nProceed with printing?", default=True):
+                    print_info("Print cancelled by user")
+                    return
+            
+            # Process image
+            print_info("Processing image...")
+            processor = ImageProcessor(dither_method=dither)
+            image_data = processor.process_image(input)
+            print_success(f"Image processed: {len(image_data)} bytes")
+            
+            # Build print commands
+            print_info("Building print commands...")
+            commands = PrinterCommands.build_print_job(
+                image_data, 
+                darkness=darkness,
+                feed_lines=100  # Feed some paper after printing
+            )
+            print_success(f"Generated {len(commands)} commands")
+            
             # Connect to printer
             print_info("Connecting to printer...")
             await printer.connect()
             print_success(f"Connected to {printer.device.name}")
             
-            # TODO: Process image/PDF and send to printer
-            # This will be implemented in Phase 3 & 4
-            print_info("\n[Phase 2 Complete] BLE connection established!")
-            print_info("Image processing and printing will be implemented in Phase 3 & 4")
+            # Send all packets to printer (no chunking - complete packets only)
+            print_info(f"Sending {len(commands)} packets to printer...")
+            await printer.send_packets(commands, delay_ms=10)
+            print_success("Print packets sent successfully!")
             
             # Disconnect
             await printer.disconnect()
-            print_success("Disconnected")
+            print_success("Print job complete!")
             
         except DeviceNotFoundError as e:
             print_error(f"Device not found: {e}")
