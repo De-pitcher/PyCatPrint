@@ -33,11 +33,11 @@ class CatPrinter:
     """
     Manages BLE connection and communication with cat printers.
     
-    Supported device names: GT01, GB02, MX11
+    Supported device names: GT01, GB02, MX11, PD01
     """
     
     # Common cat printer device names
-    DEVICE_NAMES = ['GT01', 'GB02', 'MX11']
+    DEVICE_NAMES = ['GT01', 'GB02', 'MX11', 'PD01']
     
     # Packet structure constants
     PACKET_HEADER = 0x7E
