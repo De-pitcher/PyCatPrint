@@ -1,111 +1,142 @@
-# PyCatPrint
+# 🐾 PyCatPrint
 
-A Python-based CLI tool for controlling BLE thermal printers (commonly known as "cat printers"). This tool enables printing of images and PDF files directly to your cat printer via Bluetooth Low Energy.
+> A Python CLI tool & hardware simulator for controlling BLE thermal printers (PD01, GT01, GB02, MX11).
 
-## Overview
+![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Build Status](https://img.shields.io/badge/tests-24%20passed-brightgreen.svg)
 
-PyCatPrint connects to BLE thermal printers and converts standard image formats (PNG, JPG) and PDF files into printer-compatible binary bitmaps. The tool handles image processing, dithering, and BLE communication to produce high-quality thermal prints.
+PyCatPrint connects to Bluetooth Low Energy (BLE) thermal printers—commonly known as **cat printers**—and converts standard images (PNG, JPG, BMP) and multi-page PDF documents into thermal prints.
 
-## Features
+It features a **Hardware-Less Virtual Mock Simulator (`--mock`)** that allows developers to process images, generate protocol packets, and render visual thermal print previews (`.png`) without physical printer hardware.
 
-- 🔌 **BLE Connectivity**: Auto-discover and connect to cat printers (GT01, GB02, MX11, etc.)
-- 🖼️ **Image Processing**: Convert images with advanced dithering algorithms (Floyd-Steinberg, Atkinson, Halftone)
-- 📄 **PDF Support**: Print multi-page PDFs with automatic page separation
-- ⚙️ **Customizable Settings**: Control darkness, speed, and dithering methods
-- 🔍 **Preview Mode**: Preview the binary bitmap before printing
-- 🐛 **Debug Tools**: Hex dump logging and connectivity testing
+---
 
-## Supported Printers
+## ✨ Features
 
-- GT01
-- GB02
-- MX11
-- Other 384-pixel width BLE thermal printers
+- 🔌 **BLE Connectivity**: Auto-discover & pair with thermal cat printers via Bluetooth Low Energy.
+- 🧪 **Hardware-Less Virtual Simulator (`--mock`)**: Test commands, validate protocol byte streams, and save rendered PNG printout previews when physical hardware is unavailable.
+- 🖼️ **Advanced Dithering Algorithms**:
+  - **Floyd-Steinberg**: Error diffusion for high-detail photos.
+  - **Atkinson**: Crisp contrast rendering.
+  - **Halftone (Bayer 4x4)**: Classic dot-pattern dither.
+- 📄 **PDF Document Printing**: Multi-page PDF extraction with automatic page separators.
+- ⚡ **PD01 Protocol Engine**: Reverse-engineered protocol support extracted from the official *Fun Print* APK (`com/xyz/yintibao/library/V5g.java`), including CRC8 checksum calculations (polynomial `0x07`).
+- 🔍 **ASCII & Visual Preview**: Inspect the 1-bit rasterized printout directly in the terminal or export PNG renders.
 
-## Installation
+---
 
-```bash
+## 🖨️ Protocol & Technical Specifications
+
+| Parameter | Specification |
+|-----------|---------------|
+| **Print Head Width** | 384 pixels (48 bytes per row) |
+| **Color Depth** | 1-bit Monochrome (1 = Black/Print, 0 = White/No Print) |
+| **Magic Header** | `0x51 0x78` ("Qx") |
+| **Packet Structure** | `[0x51 0x78] [CMD] [0x00] [LEN_LO] [LEN_HI] [DATA...] [CRC8] [0xFF]` |
+| **Supported Devices** | PD01, GT01, GB02, MX11, and compatible 384px BLE thermal printers |
+
+---
+
+## 📦 Installation
+
+```powershell
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/De-pitcher/PyCatPrint.git
 cd PyCatPrint
 
 # Create virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+.\venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install package in editable mode
+pip install -e .
 ```
 
-## Usage
+---
 
-```bash
-# Scan for nearby cat printers
+## 🚀 Usage
+
+### 1. Hardware-Less Simulation Mode (No Printer Required)
+
+Test printing an image and render a virtual thermal printout PNG:
+
+```powershell
+# Print image in mock mode and export rendered preview PNG
+pycatprint print -i photo.jpg --mock -o printed_preview.png
+
+# Test virtual BLE device connection
+pycatprint test --mock
+
+# Scan for virtual devices
+pycatprint scan --mock
+```
+
+### 2. Physical BLE Thermal Printing
+
+```powershell
+# Scan for nearby BLE cat printers
 pycatprint scan
 
-# Test connection to a printer
-pycatprint test
-pycatprint test --device "GT01"
+# Test connectivity to a specific printer
+pycatprint test --device "PD01"
 
-# Print an image
-pycatprint print-file --input photo.jpg
+# Print an image file
+pycatprint print -i photo.png --darkness 75 --dither floyd-steinberg
 
-# Print a PDF
-pycatprint print-file --input document.pdf
+# Print a multi-page PDF document
+pycatprint print -i document.pdf --darkness 60
 
-# Customize print settings
-pycatprint print-file --input image.png --darkness 80 --speed 2 --dither floyd-steinberg
-
-# Preview before printing
-pycatprint print-file --input image.png --preview
-
-# Specify device
-pycatprint print-file --input image.png --device "GT01"
-
-# Enable verbose logging
-pycatprint print-file --input image.png --verbose
+# Display ASCII preview before printing
+pycatprint print -i photo.png --preview
 ```
 
-## CLI Commands
+---
 
-| Command | Description |
-|---------|-------------|
-| `scan` | Scan for nearby cat printer devices |
-| `test` | Test connection to a cat printer |
-| `print-file` | Print an image or PDF file |
+## 🛠️ CLI Commands & Options
 
-## CLI Arguments (print-file)
+```
+Usage: pycatprint [OPTIONS] COMMAND [ARGS]...
 
-| Argument | Type | Description |
-|----------|------|-------------|
-| `-i, --input` | str | Path to image (PNG/JPG) or PDF file (required) |
-| `-d, --device` | str | BLE device name or MAC address (optional, auto-scans by default) |
-| `--darkness` | int | Thermal energy level: 0-100 (default: 50) |
-| `--speed` | int | Print speed: 1 (slow), 2 (medium), 3 (fast) (default: 2) |
-| `--dither` | str | Dithering algorithm: floyd-steinberg, atkinson, halftone (default: floyd-steinberg) |
-| `--preview` | flag | Show 1-bit bitmap preview before printing |
-| `-v, --verbose` | flag | Enable verbose logging |
+Commands:
+  scan   Scan for nearby cat printer devices.
+  test   Test connection to a cat printer.
+  print  Print an image or PDF file to the cat printer.
+```
 
-## Technical Details
+### Options for `print`:
 
-- **Print Width**: 384 pixels (48 bytes per row)
-- **Color Depth**: 1-bit (Black/White)
-- **MTU**: ~20 bytes (packets are automatically chunked)
-- **Protocol**: BLE with custom packet structure (header: 0x7E + payload + footer: 0x7E 0xEF)
+| Flag / Option | Description | Default |
+|---------------|-------------|---------|
+| `-i, --input <path>` | Path to image (PNG/JPG/BMP) or PDF file (**Required**) | — |
+| `-d, --device <name>` | BLE device name or MAC address | Auto-detect |
+| `-m, --mock` | Run in virtual mock mode (no BLE hardware needed) | `False` |
+| `-o, --output-preview <path>` | Save rendered thermal printout preview as PNG | — |
+| `--darkness <0-100>` | Thermal energy quality level (maps to quality 1-5) | `50` |
+| `--dither <method>` | `floyd-steinberg`, `atkinson`, or `halftone` | `floyd-steinberg` |
+| `--preview` | Show terminal ASCII preview before printing | `False` |
+| `-v, --verbose` | Enable debug logging | `False` |
 
-## Development Roadmap
+---
 
-See [ROADMAP.md](ROADMAP.md) for detailed development phases and implementation plan.
+## 🧪 Testing Suite
 
-## Reference
+PyCatPrint includes a comprehensive pytest suite covering image binarization, dithering, PD01 protocol CRC8 validation, PDF extraction, BLE mock transport, and CLI execution.
 
-This project is inspired by and references:
-- [rbaron/catprinter](https://github.com/rbaron/catprinter) - BLE protocol implementation
+```powershell
+# Run unit test suite
+.\venv\Scripts\pytest
+```
 
-## License
+---
 
-MIT License
+## 📜 License
 
-## Contributing
+Distributed under the [MIT License](LICENSE).
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+---
+
+## 👤 Author
+
+**Emmanwa Emmanuel** ([@De-pitcher](https://github.com/De-pitcher))
+- GitHub: [https://github.com/De-pitcher](https://github.com/De-pitcher)
