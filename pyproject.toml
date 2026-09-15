@@ -5,16 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pycatprint"
 version = "0.1.0"
-description = "A Python CLI tool for controlling BLE thermal printers (cat printers)"
+description = "A high-performance Python CLI tool and virtual simulator for BLE thermal cat printers (PD01, GT01, GB02, MX11)"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "Emmanwa Emmanuel", email = "emmanwa000@gmail.com"}
 ]
-keywords = ["bluetooth", "ble", "thermal printer", "cat printer", "printing"]
+keywords = ["bluetooth", "ble", "thermal printer", "cat printer", "pd01", "printing", "dithering"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -48,5 +48,9 @@ dev = [
 pycatprint = "pycatprint.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/pycatprint"
-Repository = "https://github.com/yourusername/pycatprint"
+Homepage = "https://github.com/De-pitcher/PyCatPrint"
+Repository = "https://github.com/De-pitcher/PyCatPrint"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
